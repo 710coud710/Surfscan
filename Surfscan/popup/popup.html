@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <div class="container">
+      <h3>SURFSCAN</h3>
+      
+      <div class="actions">
+        <button id="scanBtn" class="primary-btn">Scan Page</button>
+        <button id="exportBtn" class="secondary-btn" disabled>Export Data</button>
+      </div>
+
+      <div class="results" id="results">
+        <div class="field">
+          <label>Title:</label>
+          <div id="title" class="value"></div>
+        </div>
+        
+        <div class="field">
+          <label>Author:</label>
+          <div id="author" class="value"></div>
+        </div>
+        
+        <div class="field">
+          <label>Publisher:</label>
+          <div id="publisher" class="value"></div>
+        </div>
+        
+        <div class="field">
+          <label>Date Published:</label>
+          <div id="date" class="value"></div>
+        </div>
+        
+        <div class="field">
+          <label>Abstract:</label>
+          <div id="abstract" class="value"></div>
+        </div>
+      </div>
+
+      <div id="status" class="status"></div>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>
