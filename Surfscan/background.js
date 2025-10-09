@@ -15,16 +15,20 @@ chrome.runtime.onInstalled.addListener(async () => {
   autoScanEnabled = result.autoScanEnabled || false;
 });
 
-// Helper function to validate data
-const validateData = (data) => {
-  const requiredFields = ['title', 'author', 'publisher', 'date', 'abstract', 'url'];
-  const missingFields = requiredFields.filter(field => !data[field]);
+// Helper function to normalize data (replace empty fields with 'null' string)
+const normalizeData = (data) => {
+  console.log('🔄 Normalizing data:', data);
+  const fields = ['title', 'author', 'publisher', 'date', 'abstract', 'url'];
+  const normalizedData = {};
   
-  if (missingFields.length > 0) {
-    throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
-  }
+  fields.forEach(field => {
+    const value = data[field];
+    // Convert empty strings, undefined, or whitespace-only strings to 'null' string
+    normalizedData[field] = (value && value.trim()) ? value.trim() : 'null';
+  });
   
-  return true;
+  console.log('✅ Normalized data:', normalizedData);
+  return normalizedData;
 };
 
 // Message handler
@@ -32,7 +36,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Xử lý toggle auto-scan
   if (msg.action === "toggle_auto_scan") {
     autoScanEnabled = msg.enabled;
-    console.log(`Auto-scan ${autoScanEnabled ? 'bật' : 'tắt'}`);
+    console.log(`🔧 Auto-scan ${autoScanEnabled ? 'enabled' : 'disabled'}`);
     
     // Inject content script vào tất cả tabs nếu bật auto-scan
     if (autoScanEnabled) {
@@ -46,7 +50,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Xử lý auto-scan data
   if (msg.action === "auto_scan_data") {
     if (autoScanEnabled) {
-      console.log("Nhận dữ liệu auto-scan từ:", sender.tab?.url);
+      console.log("📥 Received auto-scan data from:", sender.tab?.url);
       // Xử lý dữ liệu tự động (có thể gửi về backend hoặc lưu)
       processAutoScanData(msg.data, sender.tab);
     }
@@ -64,18 +68,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // Process data asynchronously
     (async () => {
       try {
-        // Validate data
-        validateData(msg.data);
+        // Normalize data before sending
+        const normalizedData = normalizeData(msg.data);
         
         // Send to backend
-        const response = await fetch(`${API_ENDPOINT}/process`, {
+        const response = await fetch(`${API_ENDPOINT}/scan`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "X-Extension-Version": chrome.runtime.getManifest().version
           },
           body: JSON.stringify({
-            data: msg.data,
+            data: normalizedData,
             timestamp: new Date().toISOString(),
             source: sender.tab?.url || 'unknown'
           })
@@ -125,12 +129,41 @@ const injectContentScriptToAllTabs = async () => {
             enabled: true 
           });
         } catch (error) {
-          console.log(`Không thể inject vào tab ${tab.id}:`, error.message);
+          console.log(`❌ Cannot inject into tab ${tab.id}:`, error.message);
         }
       }
     }
   } catch (error) {
-    console.error('Lỗi khi inject content script:', error);
+    console.error('❌ Error injecting content script:', error);
+  }
+};
+
+// Hàm gửi dữ liệu về backend
+const sendToBackend = async (data) => {
+  try {
+    // Normalize data before sending
+    const normalizedData = normalizeData(data);
+    
+    const response = await fetch(`${API_ENDPOINT}/scan`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Extension-Version": chrome.runtime.getManifest().version
+      },
+      body: JSON.stringify(normalizedData)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Server responded with ${response.status}`);
+    }
+    
+    const result = await response.json();
+    console.log('✅ Data sent to backend successfully:', result);
+    return { success: true, result };
+    
+  } catch (error) {
+    console.error('❌ Error sending data to backend:', error);
+    return { success: false, error: error.message };
   }
 };
 
@@ -138,24 +171,28 @@ const injectContentScriptToAllTabs = async () => {
 const processAutoScanData = async (data, tab) => {
   try {
     // Log dữ liệu
-    console.log('Dữ liệu auto-scan:', {
+    console.log('Processing auto-scan data:', {
       url: tab?.url,
       title: data.title,
       timestamp: new Date().toISOString()
     });
     
-    // Có thể gửi về backend tự động
-    // await sendToBackend(data);
+    // Tự động gửi về backend
+    const backendResult = await sendToBackend(data);
     
-    // Hoặc lưu vào storage để xử lý sau
+    // Lưu vào storage (bao gồm cả trạng thái gửi backend)
     const existingData = await chrome.storage.local.get(['autoScanResults']) || { autoScanResults: [] };
     const results = existingData.autoScanResults || [];
     
-    results.push({
+    const dataWithMetadata = {
       ...data,
       timestamp: new Date().toISOString(),
-      tabUrl: tab?.url
-    });
+      tabUrl: tab?.url,
+      backendStatus: backendResult.success ? 'sent' : 'failed',
+      backendError: backendResult.error || null
+    };
+    
+    results.push(dataWithMetadata);
     
     // Giới hạn số lượng kết quả (giữ 100 kết quả gần nhất)
     if (results.length > 100) {
@@ -168,14 +205,16 @@ const processAutoScanData = async (data, tab) => {
     try {
       chrome.runtime.sendMessage({
         action: "new_scan_data",
-        data: data
+        data: dataWithMetadata,
+        backendResult: backendResult
       });
     } catch (error) {
       // Popup có thể không mở, bỏ qua lỗi
+      console.log('Popup not available for notification');
     }
     
   } catch (error) {
-    console.error('Lỗi xử lý auto-scan data:', error);
+    console.error('❌ Error processing auto-scan data:', error);
   }
 };
   

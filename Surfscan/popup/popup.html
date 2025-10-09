@@ -8,10 +8,10 @@
     <!-- PHASE 1: Giao diện trước khi bật Auto-Scan -->
     <div id="phase1" class="phase-container">
       <div class="intro-section">
-        <h2>SURFSCAN</h2>
+        <h2>SURFSCAN🏄‍♂️</h2>
         <p class="description">Auto-scan and collect data from academic websites, news, and articles</p>
         
-        <div class="features">
+        <!-- <div class="features">
           <div class="feature-item">
             <span>Title & Author</span>
           </div>
@@ -24,11 +24,16 @@
           <div class="feature-item">
             <span>Abstract</span>
           </div>
-        </div>
+        </div> -->
         
-        <button id="startAutoScan" class="start-btn">
-          START AUTO-SCAN
-        </button>
+        <div class="button-group">
+          <button id="startAutoScan" class="start-btn">
+            START AUTO-SCAN
+          </button>
+          <button id="manualScanBtn" class="manual-btn">
+            MANUAL SCAN
+          </button>
+        </div>
         
         <div id="status" class="status"></div>
       </div>
@@ -63,6 +68,35 @@
         <div class="table-footer">
           <button id="exportAllBtn" class="export-btn">EXPORT EXCEL</button>
           <button id="clearDataBtn" class="clear-btn">CLEAR ALL</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHASE 3: Manual Scan Mode -->
+    <div id="phase3" class="phase-container hidden">
+      <div class="manual-scan-header">
+        <h3>MANUAL SCAN MODE</h3>
+        <button id="backToPhase1" class="back-btn">← BACK</button>
+      </div>
+      
+      <div class="scan-controls">
+        <button id="scanCurrentPage" class="scan-btn">
+          SCAN CURRENT PAGE
+        </button>
+        <div class="scan-status" id="scanStatus"></div>
+      </div>
+      
+      <div class="scanned-data-preview" id="scannedDataPreview">
+        <div class="preview-header">
+          <h4>SCANNED DATA</h4>
+          <div class="data-actions">
+            <button id="saveDataBtn" class="save-btn" disabled>SAVE TO BACKEND</button>
+            <button id="clearPreviewBtn" class="clear-preview-btn">CLEAR</button>
+          </div>
+        </div>
+        
+        <div class="preview-content" id="previewContent">
+          <div class="no-data">No data scanned yet. Click "SCAN CURRENT PAGE" to start.</div>
         </div>
       </div>
     </div>

@@ -4,13 +4,24 @@ let autoScanEnabled = false;
 // DOM Elements
 const phase1 = document.getElementById('phase1');
 const phase2 = document.getElementById('phase2');
+const phase3 = document.getElementById('phase3');
 const startBtn = document.getElementById('startAutoScan');
 const stopBtn = document.getElementById('stopAutoScan');
+const manualScanBtn = document.getElementById('manualScanBtn');
+const backToPhase1Btn = document.getElementById('backToPhase1');
+const scanCurrentPageBtn = document.getElementById('scanCurrentPage');
+const saveDataBtn = document.getElementById('saveDataBtn');
+const clearPreviewBtn = document.getElementById('clearPreviewBtn');
+const scanStatus = document.getElementById('scanStatus');
+const previewContent = document.getElementById('previewContent');
 const dataCount = document.getElementById('dataCount');
 const dataRows = document.getElementById('dataRows');
 const exportAllBtn = document.getElementById('exportAllBtn');
 const clearDataBtn = document.getElementById('clearDataBtn');
 const dataTableContainer = document.getElementById('dataTableContainer');
+
+// Manual scan data
+let currentScannedData = null;
 
 // Khởi tạo khi popup mở
 document.addEventListener('DOMContentLoaded', async () => {
@@ -34,12 +45,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 const switchToPhase1 = () => {
   phase1.classList.remove('hidden');
   phase2.classList.add('hidden');
+  phase3.classList.add('hidden');
 };
 
 const switchToPhase2 = () => {
   phase1.classList.add('hidden');
   phase2.classList.remove('hidden');
+  phase3.classList.add('hidden');
   updateStatus("Auto-scan is running", false);
+};
+
+const switchToPhase3 = () => {
+  phase1.classList.add('hidden');
+  phase2.classList.add('hidden');
+  phase3.classList.remove('hidden');
+  clearPreview();
 };
 
 // Helper to update status
@@ -170,6 +190,133 @@ stopBtn.addEventListener('click', async () => {
   }
 });
 
+// Manual Scan Button
+manualScanBtn.addEventListener('click', () => {
+  switchToPhase3();
+});
+
+// Back to Phase 1 Button
+backToPhase1Btn.addEventListener('click', () => {
+  switchToPhase1();
+});
+
+// Scan Current Page Button
+scanCurrentPageBtn.addEventListener('click', async () => {
+  try {
+    scanCurrentPageBtn.disabled = true;
+    updateScanStatus("Scanning current page...", false);
+    
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || !isValidTab(tab)) {
+      throw new Error("Cannot scan this page. Please navigate to a valid website.");
+    }
+    
+    // Inject content script if needed
+    await injectContentScript(tab);
+    
+    // Send scan message
+    const response = await chrome.tabs.sendMessage(tab.id, { action: "scan_page" });
+    
+    if (response && response.data) {
+      currentScannedData = response.data;
+      displayScannedData(currentScannedData);
+      saveDataBtn.disabled = false;
+      updateScanStatus("Scan completed successfully!", false);
+    } else {
+      // Even if no response, create empty data structure
+      currentScannedData = {
+        title: 'null',
+        author: 'null',
+        publisher: 'null',
+        date: 'null',
+        abstract: 'null',
+        url: tab.url
+      };
+      displayScannedData(currentScannedData);
+      saveDataBtn.disabled = false;
+      updateScanStatus("Scan completed - some fields may be empty", false);
+    }
+    
+  } catch (error) {
+    updateScanStatus("Scan failed: " + error.message, true);
+    // Still allow saving with minimal data
+    currentScannedData = {
+      title: 'null',
+      author: 'null',
+      publisher: 'null',
+      date: 'null',
+      abstract: 'null',
+      url: tab?.url || window.location.href
+    };
+    displayScannedData(currentScannedData);
+    saveDataBtn.disabled = false;
+  } finally {
+    scanCurrentPageBtn.disabled = false;
+  }
+});
+
+// Save Data Button
+saveDataBtn.addEventListener('click', async () => {
+  if (!currentScannedData) {
+    updateScanStatus("No data to save", true);
+    return;
+  }
+  
+  try {
+    saveDataBtn.disabled = true;
+    updateScanStatus("Saving data to backend...", false);
+    
+    const response = await new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { action: "send_to_backend", data: currentScannedData },
+        resolve
+      );
+    });
+    
+    if (response && response.success) {
+      updateScanStatus("Data saved successfully!", false);
+      showNotification(
+        'Data Saved',
+        'Manual scan data sent to backend',
+        currentScannedData.url,
+        'success',
+        3000
+      );
+      
+      // Add to auto-scan results for consistency
+      const existingData = await chrome.storage.local.get(['autoScanResults']) || { autoScanResults: [] };
+      const results = existingData.autoScanResults || [];
+      results.push({
+        ...currentScannedData,
+        timestamp: new Date().toISOString(),
+        backendStatus: 'sent',
+        source: 'manual'
+      });
+      await chrome.storage.local.set({ autoScanResults: results });
+      
+    } else {
+      throw new Error(response ? response.error : "No response from server");
+    }
+  } catch (error) {
+    updateScanStatus("Save failed: " + error.message, true);
+    showNotification(
+      'Save Error',
+      error.message,
+      '',
+      'error',
+      4000
+    );
+  } finally {
+    saveDataBtn.disabled = false;
+  }
+});
+
+// Clear Preview Button
+clearPreviewBtn.addEventListener('click', () => {
+  clearPreview();
+  updateScanStatus("Preview cleared", false);
+});
+
 // Kiểm tra tab hợp lệ
 const isValidTab = (tab) => {
   return tab.url && (
@@ -177,6 +324,66 @@ const isValidTab = (tab) => {
     tab.url.startsWith('https://') || 
     tab.url.startsWith('file://')
   );
+};
+
+// Helper functions for manual scan
+const updateScanStatus = (message, isError = false) => {
+  if (scanStatus) {
+    scanStatus.textContent = message;
+    scanStatus.className = `scan-status ${isError ? 'error' : 'success'}`;
+  }
+};
+
+const clearPreview = () => {
+  currentScannedData = null;
+  saveDataBtn.disabled = true;
+  previewContent.innerHTML = '<div class="no-data">No data scanned yet. Click "SCAN CURRENT PAGE" to start.</div>';
+  updateScanStatus("", false);
+};
+
+const displayScannedData = (data) => {
+  if (!data) {
+    clearPreview();
+    return;
+  }
+  
+  const fields = [
+    { key: 'title', label: 'Title' },
+    { key: 'author', label: 'Author' },
+    { key: 'publisher', label: 'Publisher' },
+    { key: 'date', label: 'Date' },
+    { key: 'abstract', label: 'Abstract' },
+    { key: 'url', label: 'URL' }
+  ];
+  
+  let html = '';
+  fields.forEach(field => {
+    const value = data[field.key];
+    const isEmpty = !value || !value.toString().trim() || value === 'null';
+    
+    html += `
+      <div class="data-field">
+        <div class="data-field-label">${field.label}</div>
+        <div class="data-field-value ${isEmpty ? 'empty' : ''}">${
+          isEmpty ? 'null' : value
+        }</div>
+      </div>
+    `;
+  });
+  
+  previewContent.innerHTML = html;
+};
+
+const injectContentScript = async (tab) => {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['content.js']
+    });
+  } catch (error) {
+    // Content script might already be injected, ignore error
+    console.log('Content script injection:', error.message);
+  }
 };
 
 // Load dữ liệu đã lưu
@@ -217,8 +424,19 @@ const updateDataTable = () => {
       return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
     };
     
+    // Status indicator for backend sync
+    const getStatusIndicator = (item) => {
+      if (item.backendStatus === 'sent') {
+        return '<span class="status-indicator success" title="Sent to backend">✓</span>';
+      } else if (item.backendStatus === 'failed') {
+        return '<span class="status-indicator error" title="Failed to send to backend">✗</span>';
+      } else {
+        return '<span class="status-indicator pending" title="Pending">⏳</span>';
+      }
+    };
+    
     row.innerHTML = `
-      <div class="col-title" title="${item.title || ''}">${truncateText(item.title)}</div>
+      <div class="col-title" title="${item.title || ''}">${truncateText(item.title)} ${getStatusIndicator(item)}</div>
       <div class="col-author" title="${item.author || ''}">${truncateText(item.author, 20)}</div>
       <div class="col-publisher" title="${item.publisher || ''}">${truncateText(item.publisher, 20)}</div>
       <div class="col-date" title="${item.date || ''}">${formatDate(item.date)}</div>
@@ -283,24 +501,47 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     scannedData.push(message.data);
     updateDataTable();
     
-    // Show sliding notification
+    // Show sliding notification with backend status
     const title = message.data.title || 'New Page Scanned';
     const truncatedTitle = title.length > 50 ? title.substring(0, 50) + '...' : title;
+    
+    // Determine notification type based on backend result
+    const backendResult = message.backendResult;
+    let notificationTitle = 'Data Collected';
+    let notificationType = 'success';
+    
+    if (backendResult && backendResult.success) {
+      notificationTitle = 'Data Sent to Backend';
+      notificationType = 'success';
+    } else if (backendResult && !backendResult.success) {
+      notificationTitle = 'Backend Error';
+      notificationType = 'error';
+    }
+    
     showNotification(
-      'Data Collected',
+      notificationTitle,
       truncatedTitle,
       message.data.url,
-      'success',
-      3000
+      notificationType,
+      4000
     );
     
-    // Update status briefly
-    updateStatus(`Scanned: ${truncatedTitle}`, false);
+    // Update status briefly with backend info
+    let statusMessage = `Scanned: ${truncatedTitle}`;
+    if (backendResult) {
+      if (backendResult.success) {
+        statusMessage += ' ✓ Sent to backend';
+      } else {
+        statusMessage += ' ✗ Backend failed';
+      }
+    }
+    
+    updateStatus(statusMessage, !backendResult?.success);
     setTimeout(() => {
       if (autoScanEnabled) {
         updateStatus("Auto-scan is running", false);
       }
-    }, 2000);
+    }, 3000);
   }
 });
 

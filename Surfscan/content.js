@@ -50,12 +50,17 @@ const sendAutoScanData = () => {
   if (!autoScanEnabled) return;
   
   const data = extractData();
-  if (data.title || data.author) { // Chỉ gửi nếu có dữ liệu hữu ích
-    chrome.runtime.sendMessage({
-      action: "auto_scan_data",
-      data: data
-    });
-  }
+  // Always send data, even if some fields are empty (they will be normalized to null)
+  console.log('📤 Sending auto-scan data:', {
+    title: data.title || "'null'",
+    url: data.url || window.location.href,
+    timestamp: new Date().toISOString()
+  });
+  
+  chrome.runtime.sendMessage({
+    action: "auto_scan_data",
+    data: data
+  });
 };
 
 // Theo dõi thay đổi URL
@@ -63,7 +68,7 @@ const observeUrlChange = () => {
   const observer = new MutationObserver(() => {
     if (window.location.href !== currentUrl) {
       currentUrl = window.location.href;
-      console.log('URL đã thay đổi:', currentUrl);
+      console.log('🔄 URL changed:', currentUrl);
       
       if (autoScanEnabled) {
         // Đợi 2 giây để trang load xong rồi mới scan
@@ -95,7 +100,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   
   if (msg.action === "toggle_auto_scan") {
     autoScanEnabled = msg.enabled;
-    console.log(`Auto-scan ${autoScanEnabled ? 'bật' : 'tắt'} trên trang:`, window.location.href);
+    console.log(`🔧 Auto-scan ${autoScanEnabled ? 'enabled' : 'disabled'} on page:`, window.location.href);
     
     if (autoScanEnabled) {
       // Scan ngay lập tức khi bật

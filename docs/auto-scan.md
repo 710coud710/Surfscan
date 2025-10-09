@@ -1,8 +1,4 @@
-Rất hay — để triển khai tính năng **Auto-Scan** cho extension “Surf-can”, bạn cần hiểu rõ **logic hoạt động tổng thể**, tức là cách các thành phần (popup, content script, background) phối hợp với nhau.
-Dưới đây là **mô tả logic hoàn chỉnh** theo trình tự hoạt động thực tế, không phải code, mà là **quy trình tư duy thiết kế**.
-
----
-
+Rất hay — để triển khai tính năng **Auto-Scan** cho extension “Surf-can”, bạn cần hiểu rõ **logic hoạt động tổng thể**, tức là cách các 
 ## 🧠 1. Mục tiêu của Auto-Scan
 
 > Khi người dùng bật chế độ **Auto-Scan**, extension sẽ **tự động quét dữ liệu của trang web mỗi khi người dùng mở hoặc chuyển sang một đường link mới**, mà **không cần bấm nút “Scan” thủ công**.
