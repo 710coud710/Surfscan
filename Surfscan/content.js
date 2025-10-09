@@ -40,11 +40,87 @@ const extractData = () => {
   };
 };
 
-// Listen for scan request
+// Biến theo dõi trạng thái auto-scan
+let autoScanEnabled = false;
+let currentUrl = window.location.href;
+let scanTimeout = null;
+
+// Hàm gửi dữ liệu auto-scan
+const sendAutoScanData = () => {
+  if (!autoScanEnabled) return;
+  
+  const data = extractData();
+  if (data.title || data.author) { // Chỉ gửi nếu có dữ liệu hữu ích
+    chrome.runtime.sendMessage({
+      action: "auto_scan_data",
+      data: data
+    });
+  }
+};
+
+// Theo dõi thay đổi URL
+const observeUrlChange = () => {
+  const observer = new MutationObserver(() => {
+    if (window.location.href !== currentUrl) {
+      currentUrl = window.location.href;
+      console.log('URL đã thay đổi:', currentUrl);
+      
+      if (autoScanEnabled) {
+        // Đợi 2 giây để trang load xong rồi mới scan
+        clearTimeout(scanTimeout);
+        scanTimeout = setTimeout(() => {
+          sendAutoScanData();
+        }, 2000);
+      }
+    }
+  });
+  
+  observer.observe(document, { 
+    childList: true, 
+    subtree: true 
+  });
+  
+  return observer;
+};
+
+// Khởi tạo observer
+let urlObserver = observeUrlChange();
+
+// Listen for messages
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === "scan_page") {
     const data = extractData();
     sendResponse({ data });
   }
+  
+  if (msg.action === "toggle_auto_scan") {
+    autoScanEnabled = msg.enabled;
+    console.log(`Auto-scan ${autoScanEnabled ? 'bật' : 'tắt'} trên trang:`, window.location.href);
+    
+    if (autoScanEnabled) {
+      // Scan ngay lập tức khi bật
+      setTimeout(() => {
+        sendAutoScanData();
+      }, 1000);
+    } else {
+      // Hủy timeout khi tắt
+      clearTimeout(scanTimeout);
+    }
+    
+    sendResponse({ success: true });
+  }
+});
+
+// Scan tự động khi trang load xong (nếu auto-scan đã bật)
+window.addEventListener('load', () => {
+  // Kiểm tra trạng thái auto-scan từ storage
+  chrome.runtime.sendMessage({ action: "get_auto_scan_state" }, (response) => {
+    if (response && response.enabled) {
+      autoScanEnabled = true;
+      setTimeout(() => {
+        sendAutoScanData();
+      }, 2000);
+    }
+  });
 });
   

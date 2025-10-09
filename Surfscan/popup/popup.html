@@ -1,46 +1,75 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="UTF-8">
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
-    <div class="container">
-      <h3>SURFSCAN</h3>
-      
-      <div class="actions">
-        <button id="scanBtn" class="primary-btn">Scan Page</button>
-        <button id="exportBtn" class="secondary-btn" disabled>Export Data</button>
+    <!-- PHASE 1: Giao diện trước khi bật Auto-Scan -->
+    <div id="phase1" class="phase-container">
+      <div class="intro-section">
+        <h2>SURFSCAN</h2>
+        <p class="description">Auto-scan and collect data from academic websites, news, and articles</p>
+        
+        <div class="features">
+          <div class="feature-item">
+            <span>Title & Author</span>
+          </div>
+          <div class="feature-item">
+            <span>Publisher</span>
+          </div>
+          <div class="feature-item">
+            <span>Date Published</span>
+          </div>
+          <div class="feature-item">
+            <span>Abstract</span>
+          </div>
+        </div>
+        
+        <button id="startAutoScan" class="start-btn">
+          START AUTO-SCAN
+        </button>
+        
+        <div id="status" class="status"></div>
       </div>
-
-      <div class="results" id="results">
-        <div class="field">
-          <label>Title:</label>
-          <div id="title" class="value"></div>
-        </div>
-        
-        <div class="field">
-          <label>Author:</label>
-          <div id="author" class="value"></div>
-        </div>
-        
-        <div class="field">
-          <label>Publisher:</label>
-          <div id="publisher" class="value"></div>
-        </div>
-        
-        <div class="field">
-          <label>Date Published:</label>
-          <div id="date" class="value"></div>
-        </div>
-        
-        <div class="field">
-          <label>Abstract:</label>
-          <div id="abstract" class="value"></div>
-        </div>
-      </div>
-
-      <div id="status" class="status"></div>
     </div>
+
+    <!-- PHASE 2: Giao diện sau khi bật Auto-Scan -->
+    <div id="phase2" class="phase-container hidden">
+      <div class="header-controls">
+        <h3>AUTO-SCAN IS RUNNING</h3>
+        <button id="stopAutoScan" class="stop-btn">STOP</button>
+      </div>
+      
+      <div class="data-table-container" id="dataTableContainer">
+        <div class="table-header">
+          <span class="drag-handle">⋮⋮</span>
+          <span class="table-title">DATA SCANNED</span>
+          <span class="data-count" id="dataCount">0 items</span>
+        </div>
+        
+        <div class="table-content" id="tableContent">
+          <div class="table-row table-header-row">
+            <div class="col-title">TITLE</div>
+            <div class="col-author">AUTHOR</div>
+            <div class="col-publisher">PUBLISHER</div>
+            <div class="col-date">DATE</div>
+          </div>
+          <div id="dataRows" class="data-rows">
+            <!-- Dữ liệu sẽ được thêm vào đây -->
+          </div>
+        </div>
+        
+        <div class="table-footer">
+          <button id="exportAllBtn" class="export-btn">EXPORT EXCEL</button>
+          <button id="clearDataBtn" class="clear-btn">CLEAR ALL</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notificationContainer" class="notification-container"></div>
+
     <script src="popup.js"></script>
   </body>
 </html>
