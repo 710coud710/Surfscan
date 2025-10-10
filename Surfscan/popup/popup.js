@@ -363,29 +363,62 @@ const displayScannedData = (data) => {
     { key: 'url', label: 'URL' }
   ];
   
-  let html = '';
+  // Clear previous content
+  previewContent.innerHTML = '';
+  
   fields.forEach(field => {
     const value = data[field.key];
     const isEmpty = !value || !value.toString().trim() || value === 'null';
     const displayValue = isEmpty ? 'null' : value;
-    const isLongText = !isEmpty && displayValue.length > 100;
-    const truncatedValue = isLongText ? displayValue.substring(0, 100) + '...' : displayValue;
+        const isLongText = !isEmpty && displayValue.length > 150;
+        const truncatedValue = isLongText ? displayValue.substring(0, 150) + '...' : displayValue;
     
-    html += `
-      <div class="data-field" id="field-${field.key}">
-        <div class="data-field-label">${field.label}</div>
-        <div class="data-field-value ${isEmpty ? 'empty' : ''} ${isLongText ? 'truncated' : ''}" id="value-${field.key}">
-          <span class="truncated-text">${isLongText ? truncatedValue : displayValue}</span>
-          <span class="full-text hidden">${displayValue}</span>
-        </div>
-        ${isLongText ? `
-          <button class="more-btn" id="btn-${field.key}" onclick="toggleDataView('${field.key}')">More</button>
-        ` : ''}
-      </div>
-    `;
+    // Create field container
+    const fieldDiv = document.createElement('div');
+    fieldDiv.className = 'data-field';
+    fieldDiv.id = `field-${field.key}`;
+    
+    // Create label
+    const labelDiv = document.createElement('div');
+    labelDiv.className = 'data-field-label';
+    labelDiv.textContent = field.label;
+    
+    // Create value container
+    const valueDiv = document.createElement('div');
+    valueDiv.className = `data-field-value ${isEmpty ? 'empty' : ''} ${isLongText ? 'truncated' : ''}`;
+    valueDiv.id = `value-${field.key}`;
+    
+    // Create truncated text span
+    const truncatedSpan = document.createElement('span');
+    truncatedSpan.className = 'truncated-text';
+    truncatedSpan.innerHTML = isLongText ? truncatedValue.replace(/\n/g, '<br>') : displayValue.replace(/\n/g, '<br>');
+
+    // Create full text span
+    const fullSpan = document.createElement('span');
+    fullSpan.className = 'full-text hidden';
+    fullSpan.innerHTML = displayValue.replace(/\n/g, '<br>');
+    
+    // Add spans to value div
+    valueDiv.appendChild(truncatedSpan);
+    valueDiv.appendChild(fullSpan);
+    
+    // Add label and value to field
+    fieldDiv.appendChild(labelDiv);
+    fieldDiv.appendChild(valueDiv);
+    
+    // Add More button if needed
+    if (isLongText) {
+      const moreBtn = document.createElement('button');
+      moreBtn.className = 'more-btn';
+      moreBtn.id = `btn-${field.key}`;
+      moreBtn.textContent = 'More';
+      moreBtn.onclick = () => toggleDataView(field.key);
+      fieldDiv.appendChild(moreBtn);
+    }
+    
+    // Add field to container
+    previewContent.appendChild(fieldDiv);
   });
-  
-  previewContent.innerHTML = html;
 };
 
 const injectContentScript = async (tab) => {
@@ -561,24 +594,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // ===== DATA VIEW TOGGLE FUNCTIONALITY =====
 const toggleDataView = (fieldKey) => {
+  console.log('🔄 Toggling data view for field:', fieldKey);
+  
   const truncatedText = document.querySelector(`#value-${fieldKey} .truncated-text`);
   const fullText = document.querySelector(`#value-${fieldKey} .full-text`);
   const button = document.getElementById(`btn-${fieldKey}`);
   
-  if (!truncatedText || !fullText || !button) return;
+  console.log('Elements found:', {
+    truncatedText: !!truncatedText,
+    fullText: !!fullText,
+    button: !!button
+  });
   
-  if (fullText.classList.contains('hidden')) {
+  if (!truncatedText || !fullText || !button) {
+    console.error('❌ Missing elements for field:', fieldKey);
+    return;
+  }
+  
+  const isCurrentlyHidden = fullText.classList.contains('hidden');
+  console.log('Current state - fullText hidden:', isCurrentlyHidden);
+  
+  if (isCurrentlyHidden) {
     // Show full text
     truncatedText.classList.add('hidden');
     fullText.classList.remove('hidden');
     button.textContent = 'Hide';
     button.classList.add('hide-mode');
+    console.log('✅ Switched to full text view');
   } else {
     // Show truncated text
     truncatedText.classList.remove('hidden');
     fullText.classList.add('hidden');
     button.textContent = 'More';
     button.classList.remove('hide-mode');
+    console.log('✅ Switched to truncated view');
   }
 };
 
@@ -591,7 +640,7 @@ const showDataModal = (fieldLabel, fieldKey) => {
   const modalFieldContent = document.getElementById('modalFieldContent');
   
   modalFieldName.textContent = fieldLabel;
-  modalFieldContent.textContent = currentScannedData[fieldKey];
+  modalFieldContent.innerHTML = currentScannedData[fieldKey].replace(/\n/g, '<br>');
   
   modal.classList.remove('hidden');
 };

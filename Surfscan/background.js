@@ -57,7 +57,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           console.log("📥 Received auto-scan data from:", sender.tab?.url);
           processAutoScanData(msg.data, sender.tab);
         } else {
-          console.log("⏸️ Auto-scan data ignored - not in phase 2, current phase:", currentPhase);
+          console.log("Auto-scan data ignored - not in phase 2, current phase:", currentPhase);
         }
       });
     }
@@ -221,7 +221,7 @@ const processAutoScanData = async (data, tab) => {
     }
     
   } catch (error) {
-    console.error('❌ Error processing auto-scan data:', error);
+    console.error('Error processing auto-scan data:', error);
   }
 };
   

@@ -30,6 +30,7 @@ const extractData = () => {
     date: getMeta("article:published_time") ||
           getMeta("datePublished") ||
           getMeta("date") ||
+          getMeta("displayPublicationDate") ||
           extractDate(document.body.innerText) || "",
           
     abstract: getMeta("description") ||
@@ -72,7 +73,7 @@ const observeUrlChange = () => {
       console.log('🔄 URL changed:', currentUrl);
       
       if (autoScanEnabled) {
-        // Đợi 2 giây để trang load xong rồi mới scan
+        // Đợi 0.5 giây để trang load xong rồi mới scan
         clearTimeout(scanTimeout);
         scanTimeout = setTimeout(() => {
           sendAutoScanData();
