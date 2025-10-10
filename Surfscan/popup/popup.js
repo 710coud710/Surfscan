@@ -25,14 +25,18 @@ let currentScannedData = null;
 
 // Khởi tạo khi popup mở
 document.addEventListener('DOMContentLoaded', async () => {
-  // Kiểm tra trạng thái auto-scan hiện tại
-  const result = await chrome.storage.local.get(['autoScanEnabled', 'autoScanResults']);
+  // Kiểm tra trạng thái auto-scan và manual scan hiện tại
+  const result = await chrome.storage.local.get(['autoScanEnabled', 'autoScanResults', 'currentPhase']);
   autoScanEnabled = result.autoScanEnabled || false;
   scannedData = result.autoScanResults || [];
+  const currentPhase = result.currentPhase || 'phase1';
   
   if (autoScanEnabled) {
     switchToPhase2();
     updateDataTable();
+  } else if (currentPhase === 'phase3') {
+    // Stay in manual scan mode if it was the last active phase
+    switchToPhase3();
   } else {
     switchToPhase1();
   }
@@ -42,24 +46,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // Chuyển đổi giao diện
-const switchToPhase1 = () => {
+const switchToPhase1 = async () => {
   phase1.classList.remove('hidden');
   phase2.classList.add('hidden');
   phase3.classList.add('hidden');
+  await chrome.storage.local.set({ currentPhase: 'phase1' });
 };
 
-const switchToPhase2 = () => {
+const switchToPhase2 = async () => {
   phase1.classList.add('hidden');
   phase2.classList.remove('hidden');
   phase3.classList.add('hidden');
   updateStatus("Auto-scan is running", false);
+  await chrome.storage.local.set({ currentPhase: 'phase2' });
 };
 
-const switchToPhase3 = () => {
+const switchToPhase3 = async () => {
   phase1.classList.add('hidden');
   phase2.classList.add('hidden');
   phase3.classList.remove('hidden');
   clearPreview();
+  await chrome.storage.local.set({ currentPhase: 'phase3' });
 };
 
 // Helper to update status
@@ -360,13 +367,20 @@ const displayScannedData = (data) => {
   fields.forEach(field => {
     const value = data[field.key];
     const isEmpty = !value || !value.toString().trim() || value === 'null';
+    const displayValue = isEmpty ? 'null' : value;
+    const isLongText = !isEmpty && displayValue.length > 100;
+    const truncatedValue = isLongText ? displayValue.substring(0, 100) + '...' : displayValue;
     
     html += `
-      <div class="data-field">
+      <div class="data-field" id="field-${field.key}">
         <div class="data-field-label">${field.label}</div>
-        <div class="data-field-value ${isEmpty ? 'empty' : ''}">${
-          isEmpty ? 'null' : value
-        }</div>
+        <div class="data-field-value ${isEmpty ? 'empty' : ''} ${isLongText ? 'truncated' : ''}" id="value-${field.key}">
+          <span class="truncated-text">${isLongText ? truncatedValue : displayValue}</span>
+          <span class="full-text hidden">${displayValue}</span>
+        </div>
+        ${isLongText ? `
+          <button class="more-btn" id="btn-${field.key}" onclick="toggleDataView('${field.key}')">More</button>
+        ` : ''}
       </div>
     `;
   });
@@ -544,6 +558,77 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }, 3000);
   }
 });
+
+// ===== DATA VIEW TOGGLE FUNCTIONALITY =====
+const toggleDataView = (fieldKey) => {
+  const truncatedText = document.querySelector(`#value-${fieldKey} .truncated-text`);
+  const fullText = document.querySelector(`#value-${fieldKey} .full-text`);
+  const button = document.getElementById(`btn-${fieldKey}`);
+  
+  if (!truncatedText || !fullText || !button) return;
+  
+  if (fullText.classList.contains('hidden')) {
+    // Show full text
+    truncatedText.classList.add('hidden');
+    fullText.classList.remove('hidden');
+    button.textContent = 'Hide';
+    button.classList.add('hide-mode');
+  } else {
+    // Show truncated text
+    truncatedText.classList.remove('hidden');
+    fullText.classList.add('hidden');
+    button.textContent = 'More';
+    button.classList.remove('hide-mode');
+  }
+};
+
+// ===== MODAL FUNCTIONALITY =====
+const showDataModal = (fieldLabel, fieldKey) => {
+  if (!currentScannedData || !currentScannedData[fieldKey]) return;
+  
+  const modal = document.getElementById('dataDetailModal');
+  const modalFieldName = document.getElementById('modalFieldName');
+  const modalFieldContent = document.getElementById('modalFieldContent');
+  
+  modalFieldName.textContent = fieldLabel;
+  modalFieldContent.textContent = currentScannedData[fieldKey];
+  
+  modal.classList.remove('hidden');
+};
+
+const closeDataModal = () => {
+  const modal = document.getElementById('dataDetailModal');
+  modal.classList.add('hidden');
+};
+
+// Add event listeners for modal
+document.addEventListener('DOMContentLoaded', () => {
+  const closeModalBtn = document.getElementById('closeModal');
+  const modal = document.getElementById('dataDetailModal');
+  
+  if (closeModalBtn) {
+    closeModalBtn.addEventListener('click', closeDataModal);
+  }
+  
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        closeDataModal();
+      }
+    });
+  }
+  
+  // ESC key to close modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeDataModal();
+    }
+  });
+});
+
+// Make functions globally accessible
+window.showDataModal = showDataModal;
+window.toggleDataView = toggleDataView;
 
 // ===== DRAG AND DROP FUNCTIONALITY =====
 let isDragging = false;

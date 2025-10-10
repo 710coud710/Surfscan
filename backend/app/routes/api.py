@@ -44,28 +44,16 @@ def receive_scan_data():
         request_data = request.get_json()
         if not request_data:
             return jsonify({'error': 'No JSON data provided'}), 400
-        
         # Extract actual data from nested structure if present
         if 'data' in request_data and isinstance(request_data['data'], dict):
             data = request_data['data']
         else:
             data = request_data
-        
-        # Skip validation - extension already handles data formatting
-        # validation_result = validate_scan_data(data)
-        # if not validation_result['valid']:
-        #     return jsonify({
-        #         'error': 'Invalid data format',
-        #         'details': validation_result['errors']
-        #     }), 400
-        
         # Log received data
         logger.info(f"Received scan data from: {data.get('url', 'unknown')}")
         logger.info(f"Full data: {data}")
-        
         # Parse and clean data
         cleaned_data = parse_service.clean_scan_data(data)
-        
         # Save to CSV file
         result = file_service.save_scan_data(cleaned_data)
         

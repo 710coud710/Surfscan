@@ -50,9 +50,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Xử lý auto-scan data
   if (msg.action === "auto_scan_data") {
     if (autoScanEnabled) {
-      console.log("📥 Received auto-scan data from:", sender.tab?.url);
-      // Xử lý dữ liệu tự động (có thể gửi về backend hoặc lưu)
-      processAutoScanData(msg.data, sender.tab);
+      // Check if we're in phase 2 (auto-scan mode)
+      chrome.storage.local.get(['currentPhase']).then(result => {
+        const currentPhase = result.currentPhase || 'phase1';
+        if (currentPhase === 'phase2') {
+          console.log("📥 Received auto-scan data from:", sender.tab?.url);
+          processAutoScanData(msg.data, sender.tab);
+        } else {
+          console.log("⏸️ Auto-scan data ignored - not in phase 2, current phase:", currentPhase);
+        }
+      });
     }
     sendResponse({ success: true });
     return true;

@@ -29,6 +29,7 @@ const extractData = () => {
                
     date: getMeta("article:published_time") ||
           getMeta("datePublished") ||
+          getMeta("date") ||
           extractDate(document.body.innerText) || "",
           
     abstract: getMeta("description") ||
@@ -75,7 +76,7 @@ const observeUrlChange = () => {
         clearTimeout(scanTimeout);
         scanTimeout = setTimeout(() => {
           sendAutoScanData();
-        }, 2000);
+        }, 500);
       }
     }
   });
@@ -106,7 +107,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       // Scan ngay lập tức khi bật
       setTimeout(() => {
         sendAutoScanData();
-      }, 1000);
+      }, 500);
     } else {
       // Hủy timeout khi tắt
       clearTimeout(scanTimeout);
@@ -124,7 +125,7 @@ window.addEventListener('load', () => {
       autoScanEnabled = true;
       setTimeout(() => {
         sendAutoScanData();
-      }, 2000);
+      }, 1000);
     }
   });
 });
