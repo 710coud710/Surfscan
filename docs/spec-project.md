@@ -96,7 +96,7 @@ const extractData = () => {
     publisher: document.querySelector("meta[property='og:site_name']")?.content || "",
     date: (document.body.innerText.match(/\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4}|[A-Z][a-z]+ \d{1,2}, \d{4}/) || [])[0] || "",
     abstract: getMeta("description") || document.querySelector("[class*='abstract']")?.innerText || "",
-    url: window.location.href
+    url: window.location.href0.
   };
   return data;
 };
